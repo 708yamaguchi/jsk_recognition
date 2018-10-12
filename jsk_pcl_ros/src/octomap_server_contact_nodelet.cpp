@@ -730,7 +730,6 @@ namespace jsk_pcl_ros
 
       // publish frontier grid as marker
       if (publishFrontierMarkerArray) {
-        ROS_WARN("start publish frontier if");
         visualization_msgs::MarkerArray frontierNodesVis;
         frontierNodesVis.markers.resize(1);
         pcl::PointCloud<pcl::PointXYZ> frontierCloud;
@@ -740,13 +739,20 @@ namespace jsk_pcl_ros
         int x_num = int(((m_occupancyMaxX - m_occupancyMinX) / resolution));
         int y_num = int(((m_occupancyMaxY - m_occupancyMinY) / resolution));
         int z_num = int(((m_occupancyMaxZ - m_occupancyMinZ) / resolution));
-        ROS_WARN("create vector: check");
         // ROS_INFO_STREAM("x: " << x_num << " y: " << y_num << " z: " << z_num);
-        std::vector< std::vector< std::vector<int> > > check(x_num, std::vector< std::vector<int> >(y_num, std::vector<int>(z_num)));
+        std::vector< std::vector< std::vector<int> > > check_unknown(x_num, std::vector< std::vector<int> >(y_num, std::vector<int>(z_num)));
         for (int i=0; i<x_num; i++) {
           for (int j=0; j<y_num; j++) {
             for (int k=0; k<z_num; k++) {
-              check[i][j][k] = 0;
+              check_unknown[i][j][k] = 0;
+            }
+          }
+        }
+        std::vector< std::vector< std::vector<int> > > check_free(x_num, std::vector< std::vector<int> >(y_num, std::vector<int>(z_num)));
+        for (int i=0; i<x_num; i++) {
+          for (int j=0; j<y_num; j++) {
+            for (int k=0; k<z_num; k++) {
+              check_free[i][j][k] = 0;
             }
           }
         }
@@ -761,7 +767,7 @@ namespace jsk_pcl_ros
           double y_unknown = it_unknown->y();
           double z_unknown = it_unknown->z();
           // ROS_INFO_STREAM("x_u: " << int(std::round((x_unknown - m_occupancyMinX) / resolution - 1)) << " y_u: " << int(std::round((y_unknown - m_occupancyMinY) / resolution - 1)) << " z_u: " << int(std::round((z_unknown - m_occupancyMinZ) / resolution - 1)));
-          check[int(std::round((x_unknown - m_occupancyMinX) / resolution - 1))][int(std::round((y_unknown - m_occupancyMinY) / resolution - 1))][int(std::round((z_unknown - m_occupancyMinZ) / resolution - 1))] = 1;
+          check_unknown[int(std::round((x_unknown - m_occupancyMinX) / resolution - 1))][int(std::round((y_unknown - m_occupancyMinY) / resolution - 1))][int(std::round((z_unknown - m_occupancyMinZ) / resolution - 1))] = 1;
         }
 
         ROS_WARN("start process free grids");
@@ -783,7 +789,6 @@ namespace jsk_pcl_ros
             for (int i=x_min_index-1; i<=x_min_index+int(size_free/resolution); i++) {
               for (int j=y_min_index-1; j<=y_min_index+int(size_free/resolution); j++) {
                 for (int k=z_min_index-1; k<=z_min_index+int(size_free/resolution); k++) {
-                  int flag = 0;
                   for (int l=-1; l<=1; l++) {
                     if ( 0 <= i+l && i+l < x_num) {
                       for (int m=-1; m<=1; m++) {
@@ -791,12 +796,10 @@ namespace jsk_pcl_ros
                           for (int n=-1; n<=1; n++) {
                             if ( 0 <= k+n && k+n < z_num) {
                               if ((l == 0 && m == 0 && n== 0) ||
-                                  i < 0 || i >= x_num ||
-                                  j < 0 || j >= y_num ||
-                                  k < 0 || k >= z_num)
+                                  i < 0 || i >= x_num || j < 0 || j >= y_num || k < 0 || k >= z_num)
                                 continue;
-                              if (check[i+l][j+m][k+n] == 1 && check[i][j][k] == 0 && flag == 0) {
-                                flag = 1;
+                              if (check_unknown[i+l][j+m][k+n] == 1 && check_unknown[i][j][k] == 0 && check_free[i][j][k] == 0) {
+                                check_free[i][j][k] = 1;  // avoid check same free grids more than once
                                 cubeCenter.x = (i+0.5)*resolution + m_occupancyMinX;
                                 cubeCenter.y = (j+0.5)*resolution + m_occupancyMinY;
                                 cubeCenter.z = (k+0.5)*resolution + m_occupancyMinZ;
