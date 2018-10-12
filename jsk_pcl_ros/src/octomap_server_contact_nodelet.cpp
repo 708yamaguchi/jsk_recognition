@@ -488,6 +488,7 @@ namespace jsk_pcl_ros
   }
 
   void OctomapServerContact::publishAll(const ros::Time& rostime) {
+    ROS_INFO("publishALL");
     ros::WallTime startTime = ros::WallTime::now();
     size_t octomapSize = m_octreeContact->size();
     // TODO: estimate num occ. voxels for size of arrays (reserve)
@@ -730,73 +731,146 @@ namespace jsk_pcl_ros
 
       //
       // publish frontier grid as marker
-      if (1) {
-      // if (publishFrontierMarkerArray) {
-        // visualization_msgs::MarkerArray frontierNodesVis;
-        // pcl::PointCloud<pcl::PointXYZ> frontierCloud;
-        // double resolution = m_octreeContact->getResolution();
+      if (publishFrontierMarkerArray) {
+        ROS_INFO("publish frontier grids as marker");
+        if (publishFrontierMarkerArray) {
+          visualization_msgs::MarkerArray frontierNodesVis;
+          frontierNodesVis.markers.resize(1);
+          pcl::PointCloud<pcl::PointXYZ> frontierCloud;
+          // std::vector<bool> check(m_occupancyMaxX - m_occupancyMinX, m_occupancyMinY, m_occupancyMinZ)
 
-        // for (point3d_list::iterator it = unknownLeaves.begin(); it != unknownLeaves.end(); it++) {
-        //   float x = (*it).x();
-        //   float y = (*it).y();
-        //   float z = (*it).z();
-        //   frontierCloud.push_back(pcl::PointXYZ(x, y, z));
-        //   OcTreeKey key;
-        //   geometry_msgs::Point cubeCenter;
-        //   cubeCenter.x = x;
-        //   cubeCenter.y = y;
-        //   cubeCenter.z = z;
+          for (OcTree::iterator it_free = m_octreeContact->begin(m_maxTreeDepth), end = m_octreeContact->end(); it_free != end; ++it_free) {
+            if (m_octreeContact->isNodeFree(*it_free)) {
+              double x_free = it_free.getX();
+              double y_free = it_free.getY();
+              double z_free = it_free.getZ();
+              double size_free = it_free.getSize();
 
-        //   for (int i = -1; 1; i++){
-        //     for (int j = -1; 1; i++){
-        //       for (int k = -1; 1; i++){
-        //         point3d point(x+i*resolution, y+j*resolution, z+k*resolution);
-        //         OcTreeNode* node = m_octreeContact->search(point, 0);
-        //         if(m_octreeContact->isNodeFree(node)){
-        //             geometry_msgs::Point cubeCenter;
-        //             if (m_useHeightMap) {
-        //               double minX, minY, minZ, maxX, maxY, maxZ;
-        //               m_octreeContact->getMetricMin(minX, minY, minZ);
-        //               m_octreeContact->getMetricMax(maxX, maxY, maxZ);
-        //               double h = (1.0 - std::min(std::max((cubeCenter.z-minZ)/ (maxZ - minZ), 0.0), 1.0)) *m_colorFactor;
-        //               frontierNodesVis.markers[0].colors.push_back(heightMapColor(h));
-        //             }
-        //             frontierNodesVis.markers[0].points.push_back(cubeCenter);
-        //         }
-        //       }
-        //     }
-        //   }
-        // }
-        // // publish frontier grid as marker
-        // double size = m_octreeContact->getNodeSize(m_maxTreeDepth);
-        // frontierNodesVis.markers[0].header.frame_id = m_worldFrameId;
-        // frontierNodesVis.markers[0].header.stamp = rostime;
-        // frontierNodesVis.markers[0].ns = m_worldFrameId;
-        // frontierNodesVis.markers[0].id = 0;
-        // frontierNodesVis.markers[0].type = visualization_msgs::Marker::CUBE_LIST;
-        // frontierNodesVis.markers[0].scale.x = size;
-        // frontierNodesVis.markers[0].scale.y = size;
-        // frontierNodesVis.markers[0].scale.z = size;
-        // frontierNodesVis.markers[0].color = m_colorFrontier;
+              if (x_free > m_occupancyMinX && x_free < m_occupancyMaxX && y_free > m_occupancyMinY && y_free < m_occupancyMaxY && z_free > m_occupancyMinZ && z_free < m_occupancyMaxZ) {
+                for (point3d_list::iterator it_unknown = unknownLeaves.begin();
+                     it_unknown != unknownLeaves.end();
+                     it_unknown++) {
+                  double x_unknown = it_unknown->x();
+                  double y_unknown = it_unknown->y();
+                  double z_unknown = it_unknown->z();
+                  double size_unknown = m_octreeContact->getResolution();
 
-        // if (frontierNodesVis.markers[0].points.size() > 0) {
-        //   frontierNodesVis.markers[0].action = visualization_msgs::Marker::ADD;
-        // }
-        // else {
-        //   frontierNodesVis.markers[0].action = visualization_msgs::Marker::DELETE;
-        // }
-        // m_fromarkerPub.publish(frontierNodesVis);
+                  geometry_msgs::Point cubeCenter;
+                  cubeCenter.x = x_unknown;
+                  cubeCenter.y = y_unknown;
+                  cubeCenter.z = z_unknown;
 
-        // // publish frontier grid as pointcloud
-        // sensor_msgs::PointCloud2 frontierRosCloud;
-        // pcl::toROSMsg (frontierCloud, frontierRosCloud);
-        // frontierRosCloud.header.frame_id = m_worldFrameId;
-        // frontierRosCloud.header.stamp = rostime;
-        // m_frontierPointCloudPub.publish(frontierRosCloud);
+                  double distance = size_free / 2.0 + size_unknown / 2.0;
 
+                  double x_diff = std::abs(x_unknown - x_free);
+                  double y_diff = std::abs(y_unknown - y_free);
+                  double z_diff = std::abs(z_unknown - z_free);
+
+                  // ROS_INFO_STREAM(size_free << " " << size_unknown);
+                  // ROS_INFO_STREAM(distance << " " << std::max(z_diff, std::max(x_diff, y_diff)));
+
+                  if (//size_unknown / 2.0 - 0.0001 < abs(distance - std::max(z_diff, std::max(x_diff, y_diff))) and
+                      std::abs(distance - std::max(z_diff, std::max(x_diff, y_diff))) < size_unknown / 2.0 + 0.0001) {
+                    // ROS_INFO("if m_octreeContact");  // no print in for loop
+                    if (m_useHeightMap) {
+                      double minX, minY, minZ, maxX, maxY, maxZ;
+                      m_octreeContact->getMetricMin(minX, minY, minZ);
+                      m_octreeContact->getMetricMax(maxX, maxY, maxZ);
+                      double h = (1.0 - std::min(std::max((cubeCenter.z-minZ)/ (maxZ - minZ), 0.0), 1.0)) *m_colorFactor;
+                      frontierNodesVis.markers[0].colors.push_back(heightMapColor(h));
+                    }
+                    // ROS_INFO("if M_octreeContact end");  // no print in for loop
+                    frontierNodesVis.markers[0].points.push_back(cubeCenter);
+                  }
+                }
+              }
+            }
+          }
+          /*
+          for (point3d_list::iterator it = unknownLeaves.begin(); it != unknownLeaves.end(); it++) {
+            ROS_INFO("unknownLeaves iteration start");
+            float x = (*it).x();
+            float y = (*it).y();
+            float z = (*it).z();
+            frontierCloud.push_back(pcl::PointXYZ(x, y, z));
+            OcTreeKey key;
+            geometry_msgs::Point cubeCenter;
+            cubeCenter.x = x;
+            cubeCenter.y = y;
+            cubeCenter.z = z;
+
+            for (int i = -1; i<=1; i++) {
+              for (int j = -1; j<=1; j++) {
+                for (int k = -1; k<=1; k++) {
+                  ROS_INFO_STREAM("i: " << i << " j: " << j << " k: " << k);
+                  if (i == 0 and j == 0 and k == 0)
+                    continue;
+                  if (x+i*resolution > m_occupancyMinX &&
+                      x+i*resolution < m_occupancyMaxX &&
+                      y+j*resolution > m_occupancyMinY &&
+                      y+j*resolution < m_occupancyMaxY &&
+                      z+k*resolution > m_occupancyMinZ &&
+                      z+k*resolution < m_occupancyMaxZ) {
+                    point3d point(x+i*resolution, y+j*resolution, z+k*resolution);
+                    ROS_INFO_STREAM("x: " << x+i*resolution << " y: " << y+j*resolution << " z: " << z+k*resolution);
+                    OcTreeNode* node = m_octreeContact->search(point, 0);
+
+                    ROS_INFO_STREAM("search end  results: [" << node << "]");
+
+                    if(node && m_octreeContact->isNodeFree(node)) {
+                      ROS_INFO("if m_octreeContact");
+                      if (m_useHeightMap) {
+                        double minX, minY, minZ, maxX, maxY, maxZ;
+                        m_octreeContact->getMetricMin(minX, minY, minZ);
+                        m_octreeContact->getMetricMax(maxX, maxY, maxZ);
+                        double h = (1.0 - std::min(std::max((cubeCenter.z-minZ)/ (maxZ - minZ), 0.0), 1.0)) *m_colorFactor;
+                        frontierNodesVis.markers[0].colors.push_back(heightMapColor(h));
+                      }
+                      ROS_INFO("if M_octreeContact end");
+                      frontierNodesVis.markers[0].points.push_back(cubeCenter);
+                      ROS_INFO("push_back end");
+                    }
+                  }
+                }
+              }
+            }
+          }
+          */
+
+          // publish frontier grid as marker
+          ROS_INFO_STREAM("push_back end " << frontierNodesVis.markers[0].points.size());
+          double size = m_octreeContact->getNodeSize(m_maxTreeDepth);
+          frontierNodesVis.markers[0].header.frame_id = m_worldFrameId;
+          frontierNodesVis.markers[0].header.stamp = rostime;
+          frontierNodesVis.markers[0].ns = m_worldFrameId;
+          frontierNodesVis.markers[0].id = 0;
+          frontierNodesVis.markers[0].type = visualization_msgs::Marker::CUBE_LIST;
+          frontierNodesVis.markers[0].scale.x = size;
+          frontierNodesVis.markers[0].scale.y = size;
+          frontierNodesVis.markers[0].scale.z = size;
+          frontierNodesVis.markers[0].color = m_colorFrontier;
+
+          if (frontierNodesVis.markers[0].points.size() > 0) {
+            frontierNodesVis.markers[0].action = visualization_msgs::Marker::ADD;
+          }
+          else {
+            frontierNodesVis.markers[0].action = visualization_msgs::Marker::DELETE;
+          }
+
+          ROS_INFO("777777777777777777777");
+          m_fromarkerPub.publish(frontierNodesVis);
+
+          // publish frontier grid as pointcloud
+          sensor_msgs::PointCloud2 frontierRosCloud;
+          pcl::toROSMsg (frontierCloud, frontierRosCloud);
+          frontierRosCloud.header.frame_id = m_worldFrameId;
+          frontierRosCloud.header.stamp = rostime;
+          m_frontierPointCloudPub.publish(frontierRosCloud);
+
+        }
       }
     }
-          //
+             //
 
     // finish pointcloud:
     if (publishPointCloud) {
