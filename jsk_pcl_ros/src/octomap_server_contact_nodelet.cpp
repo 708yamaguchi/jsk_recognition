@@ -779,9 +779,10 @@ namespace jsk_pcl_ros
             int z_min_index = int((z_free - (size_free / 2.0) - m_occupancyMinZ) / size_free);
             geometry_msgs::Point cubeCenter;
             // check adjacent grids
-            for (int i=x_min_index; i<x_min_index+int(size_free/resolution); i++) {
-              for (int j=y_min_index; j<y_min_index+int(size_free/resolution); j++) {
-                for (int k=z_min_index; k<z_min_index+int(size_free/resolution); k++) {
+            // consider slightly larger region of free grids, because free grids and unknown grids are displaced half
+            for (int i=x_min_index-1; i<=x_min_index+int(size_free/resolution); i++) {
+              for (int j=y_min_index-1; j<=y_min_index+int(size_free/resolution); j++) {
+                for (int k=z_min_index-1; k<=z_min_index+int(size_free/resolution); k++) {
                   int flag = 0;
                   for (int l=-1; l<=1; l++) {
                     if ( 0 <= i+l && i+l < x_num) {
@@ -789,9 +790,12 @@ namespace jsk_pcl_ros
                         if ( 0 <= j+m && j+m < y_num) {
                           for (int n=-1; n<=1; n++) {
                             if ( 0 <= k+n && k+n < z_num) {
-                              if (l == 0 && m == 0 && n== 0)
+                              if ((l == 0 && m == 0 && n== 0) ||
+                                  i < 0 || i >= x_num ||
+                                  j < 0 || j >= y_num ||
+                                  k < 0 || k >= z_num)
                                 continue;
-                              if (check[i+l][j+m][k+n] == 1 && flag == 0) {
+                              if (check[i+l][j+m][k+n] == 1 && check[i][j][k] == 0 && flag == 0) {
                                 flag = 1;
                                 cubeCenter.x = (i+0.5)*resolution + m_occupancyMinX;
                                 cubeCenter.y = (j+0.5)*resolution + m_occupancyMinY;
