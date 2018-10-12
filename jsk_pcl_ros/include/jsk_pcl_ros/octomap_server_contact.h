@@ -69,6 +69,7 @@ namespace jsk_pcl_ros
    protected:
      virtual void onInit();
      ros::Publisher m_unknownPointCloudPub, m_umarkerPub;
+     ros::Publisher m_frontierPointCloudPub, m_fromarkerPub;
      message_filters::Subscriber<sensor_msgs::PointCloud2>* m_pointProximitySub;
      tf::MessageFilter<sensor_msgs::PointCloud2>* m_tfPointProximitySub;
      message_filters::Subscriber<jsk_recognition_msgs::ContactSensorArray> m_contactSensorSub;
@@ -76,8 +77,11 @@ namespace jsk_pcl_ros
      ros::ServiceServer m_octomapBinaryService, m_octomapFullService, m_clearBBXService, m_resetService;
 
      std_msgs::ColorRGBA m_colorUnknown;
+     std_msgs::ColorRGBA m_colorFrontier;
 
      bool m_publishUnknownSpace;
+     bool m_publishFrontierSpace;
+
      double m_offsetVisualizeUnknown;
 
      double m_maxRangeProximity;

@@ -47,6 +47,7 @@ namespace jsk_pcl_ros
     DiagnosticNodelet("OctomapServerContact"),
     m_octreeContact(NULL),
     m_publishUnknownSpace(false),
+    m_publishFrontierSpace(false),
     m_offsetVisualizeUnknown(0),
     m_maxRangeProximity(0.05),
     m_occupancyMinX(-std::numeric_limits<double>::max()),
@@ -69,6 +70,8 @@ namespace jsk_pcl_ros
     privateNh.param("publish_unknown_space", m_publishUnknownSpace, m_publishUnknownSpace);
     privateNh.param("offset_vis_unknown", m_offsetVisualizeUnknown, m_offsetVisualizeUnknown);
 
+    privateNh.param("publish_frontier_space", m_publishFrontierSpace, m_publishFrontierSpace);
+
     privateNh.param("sensor_model/max_range_proximity", m_maxRangeProximity, m_maxRangeProximity);
 
     privateNh.param("occupancy_min_x", m_occupancyMinX,m_occupancyMinX);
@@ -78,18 +81,29 @@ namespace jsk_pcl_ros
 
     privateNh.param("use_vertex", m_useVertex,m_useVertex);
 
-    double r, g, b, a;
-    privateNh.param("color_unknown/r", r, 0.5);
-    privateNh.param("color_unknown/g", g, 0.5);
-    privateNh.param("color_unknown/b", b, 0.7);
-    privateNh.param("color_unknown/a", a, 1.0);
-    m_colorUnknown.r = r;
-    m_colorUnknown.g = g;
-    m_colorUnknown.b = b;
-    m_colorUnknown.a = a;
+    double u_r, u_g, u_b, u_a, fro_r, fro_g, fro_b, fro_a;
+    privateNh.param("color_unknown/r", u_r, 0.5);
+    privateNh.param("color_unknown/g", u_g, 0.5);
+    privateNh.param("color_unknown/b", u_b, 0.7);
+    privateNh.param("color_unknown/a", u_a, 1.0);
+    privateNh.param("color_frontier/r", fro_r, 1.0);
+    privateNh.param("color_frontier/g", fro_g, 0.0);
+    privateNh.param("color_frontier/b", fro_b, 0.0);
+    privateNh.param("color_frontier/a", fro_a, 1.0);
+    m_colorUnknown.r = u_r;
+    m_colorUnknown.g = u_g;
+    m_colorUnknown.b = u_b;
+    m_colorUnknown.a = u_a;
+    m_colorFrontier.r = fro_r;
+    m_colorFrontier.g = fro_g;
+    m_colorFrontier.b = fro_b;
+    m_colorFrontier.a = fro_a;
 
     m_unknownPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("octomap_unknown_point_cloud_centers", 1, m_latchedTopics);
     m_umarkerPub = m_nh.advertise<visualization_msgs::MarkerArray>("unknown_cells_vis_array", 1, m_latchedTopics);
+
+    m_frontierPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("octomap_frontier_point_cloud_centers", 1, m_latchedTopics);
+    m_fromarkerPub = m_nh.advertise<visualization_msgs::MarkerArray>("frontier_cells_vis_array", 1, m_latchedTopics);
 
     m_pointProximitySub = new message_filters::Subscriber<sensor_msgs::PointCloud2> (m_nh, "proximity_in", 5);
     m_tfPointProximitySub = new tf::MessageFilter<sensor_msgs::PointCloud2> (*m_pointProximitySub, m_tfListener, m_worldFrameId, 5);
@@ -484,6 +498,7 @@ namespace jsk_pcl_ros
 
     bool publishFreeMarkerArray = m_publishFreeSpace && (m_latchedTopics || m_fmarkerPub.getNumSubscribers() > 0);
     bool publishUnknownMarkerArray = m_publishUnknownSpace && (m_latchedTopics || m_umarkerPub.getNumSubscribers() > 0);
+    bool publishFrontierMarkerArray = m_publishFrontierSpace && (m_latchedTopics || m_fromarkerPub.getNumSubscribers() > 0);
     bool publishMarkerArray = (m_latchedTopics || m_markerPub.getNumSubscribers() > 0);
     bool publishPointCloud = (m_latchedTopics || m_pointCloudPub.getNumSubscribers() > 0);
     bool publishBinaryMap = (m_latchedTopics || m_binaryMapPub.getNumSubscribers() > 0);
@@ -712,7 +727,76 @@ namespace jsk_pcl_ros
       unknownRosCloud.header.frame_id = m_worldFrameId;
       unknownRosCloud.header.stamp = rostime;
       m_unknownPointCloudPub.publish(unknownRosCloud);
+
+      //
+      // publish frontier grid as marker
+      if (1) {
+      // if (publishFrontierMarkerArray) {
+        // visualization_msgs::MarkerArray frontierNodesVis;
+        // pcl::PointCloud<pcl::PointXYZ> frontierCloud;
+        // double resolution = m_octreeContact->getResolution();
+
+        // for (point3d_list::iterator it = unknownLeaves.begin(); it != unknownLeaves.end(); it++) {
+        //   float x = (*it).x();
+        //   float y = (*it).y();
+        //   float z = (*it).z();
+        //   frontierCloud.push_back(pcl::PointXYZ(x, y, z));
+        //   OcTreeKey key;
+        //   geometry_msgs::Point cubeCenter;
+        //   cubeCenter.x = x;
+        //   cubeCenter.y = y;
+        //   cubeCenter.z = z;
+
+        //   for (int i = -1; 1; i++){
+        //     for (int j = -1; 1; i++){
+        //       for (int k = -1; 1; i++){
+        //         point3d point(x+i*resolution, y+j*resolution, z+k*resolution);
+        //         OcTreeNode* node = m_octreeContact->search(point, 0);
+        //         if(m_octreeContact->isNodeFree(node)){
+        //             geometry_msgs::Point cubeCenter;
+        //             if (m_useHeightMap) {
+        //               double minX, minY, minZ, maxX, maxY, maxZ;
+        //               m_octreeContact->getMetricMin(minX, minY, minZ);
+        //               m_octreeContact->getMetricMax(maxX, maxY, maxZ);
+        //               double h = (1.0 - std::min(std::max((cubeCenter.z-minZ)/ (maxZ - minZ), 0.0), 1.0)) *m_colorFactor;
+        //               frontierNodesVis.markers[0].colors.push_back(heightMapColor(h));
+        //             }
+        //             frontierNodesVis.markers[0].points.push_back(cubeCenter);
+        //         }
+        //       }
+        //     }
+        //   }
+        // }
+        // // publish frontier grid as marker
+        // double size = m_octreeContact->getNodeSize(m_maxTreeDepth);
+        // frontierNodesVis.markers[0].header.frame_id = m_worldFrameId;
+        // frontierNodesVis.markers[0].header.stamp = rostime;
+        // frontierNodesVis.markers[0].ns = m_worldFrameId;
+        // frontierNodesVis.markers[0].id = 0;
+        // frontierNodesVis.markers[0].type = visualization_msgs::Marker::CUBE_LIST;
+        // frontierNodesVis.markers[0].scale.x = size;
+        // frontierNodesVis.markers[0].scale.y = size;
+        // frontierNodesVis.markers[0].scale.z = size;
+        // frontierNodesVis.markers[0].color = m_colorFrontier;
+
+        // if (frontierNodesVis.markers[0].points.size() > 0) {
+        //   frontierNodesVis.markers[0].action = visualization_msgs::Marker::ADD;
+        // }
+        // else {
+        //   frontierNodesVis.markers[0].action = visualization_msgs::Marker::DELETE;
+        // }
+        // m_fromarkerPub.publish(frontierNodesVis);
+
+        // // publish frontier grid as pointcloud
+        // sensor_msgs::PointCloud2 frontierRosCloud;
+        // pcl::toROSMsg (frontierCloud, frontierRosCloud);
+        // frontierRosCloud.header.frame_id = m_worldFrameId;
+        // frontierRosCloud.header.stamp = rostime;
+        // m_frontierPointCloudPub.publish(frontierRosCloud);
+
+      }
     }
+          //
 
     // finish pointcloud:
     if (publishPointCloud) {
