@@ -488,7 +488,6 @@ namespace jsk_pcl_ros
   }
 
   void OctomapServerContact::publishAll(const ros::Time& rostime) {
-    ROS_INFO("publishALL");
     ros::WallTime startTime = ros::WallTime::now();
     size_t octomapSize = m_octreeContact->size();
     // TODO: estimate num occ. voxels for size of arrays (reserve)
@@ -732,7 +731,6 @@ namespace jsk_pcl_ros
       //
       // publish frontier grid as marker
       if (publishFrontierMarkerArray) {
-        ROS_INFO("publish frontier grids as marker");
         if (publishFrontierMarkerArray) {
           visualization_msgs::MarkerArray frontierNodesVis;
           frontierNodesVis.markers.resize(1);
@@ -766,12 +764,7 @@ namespace jsk_pcl_ros
                   double y_diff = std::abs(y_unknown - y_free);
                   double z_diff = std::abs(z_unknown - z_free);
 
-                  // ROS_INFO_STREAM(size_free << " " << size_unknown);
-                  // ROS_INFO_STREAM(distance << " " << std::max(z_diff, std::max(x_diff, y_diff)));
-
-                  if (//size_unknown / 2.0 - 0.0001 < abs(distance - std::max(z_diff, std::max(x_diff, y_diff))) and
-                      std::abs(distance - std::max(z_diff, std::max(x_diff, y_diff))) < size_unknown / 2.0 + 0.0001) {
-                    // ROS_INFO("if m_octreeContact");  // no print in for loop
+                  if (std::abs(distance - std::max(z_diff, std::max(x_diff, y_diff))) < size_unknown / 2.0 + 0.0001) {
                     if (m_useHeightMap) {
                       double minX, minY, minZ, maxX, maxY, maxZ;
                       m_octreeContact->getMetricMin(minX, minY, minZ);
@@ -779,66 +772,15 @@ namespace jsk_pcl_ros
                       double h = (1.0 - std::min(std::max((cubeCenter.z-minZ)/ (maxZ - minZ), 0.0), 1.0)) *m_colorFactor;
                       frontierNodesVis.markers[0].colors.push_back(heightMapColor(h));
                     }
-                    // ROS_INFO("if M_octreeContact end");  // no print in for loop
                     frontierNodesVis.markers[0].points.push_back(cubeCenter);
                   }
                 }
               }
             }
           }
-          /*
-          for (point3d_list::iterator it = unknownLeaves.begin(); it != unknownLeaves.end(); it++) {
-            ROS_INFO("unknownLeaves iteration start");
-            float x = (*it).x();
-            float y = (*it).y();
-            float z = (*it).z();
-            frontierCloud.push_back(pcl::PointXYZ(x, y, z));
-            OcTreeKey key;
-            geometry_msgs::Point cubeCenter;
-            cubeCenter.x = x;
-            cubeCenter.y = y;
-            cubeCenter.z = z;
-
-            for (int i = -1; i<=1; i++) {
-              for (int j = -1; j<=1; j++) {
-                for (int k = -1; k<=1; k++) {
-                  ROS_INFO_STREAM("i: " << i << " j: " << j << " k: " << k);
-                  if (i == 0 and j == 0 and k == 0)
-                    continue;
-                  if (x+i*resolution > m_occupancyMinX &&
-                      x+i*resolution < m_occupancyMaxX &&
-                      y+j*resolution > m_occupancyMinY &&
-                      y+j*resolution < m_occupancyMaxY &&
-                      z+k*resolution > m_occupancyMinZ &&
-                      z+k*resolution < m_occupancyMaxZ) {
-                    point3d point(x+i*resolution, y+j*resolution, z+k*resolution);
-                    ROS_INFO_STREAM("x: " << x+i*resolution << " y: " << y+j*resolution << " z: " << z+k*resolution);
-                    OcTreeNode* node = m_octreeContact->search(point, 0);
-
-                    ROS_INFO_STREAM("search end  results: [" << node << "]");
-
-                    if(node && m_octreeContact->isNodeFree(node)) {
-                      ROS_INFO("if m_octreeContact");
-                      if (m_useHeightMap) {
-                        double minX, minY, minZ, maxX, maxY, maxZ;
-                        m_octreeContact->getMetricMin(minX, minY, minZ);
-                        m_octreeContact->getMetricMax(maxX, maxY, maxZ);
-                        double h = (1.0 - std::min(std::max((cubeCenter.z-minZ)/ (maxZ - minZ), 0.0), 1.0)) *m_colorFactor;
-                        frontierNodesVis.markers[0].colors.push_back(heightMapColor(h));
-                      }
-                      ROS_INFO("if M_octreeContact end");
-                      frontierNodesVis.markers[0].points.push_back(cubeCenter);
-                      ROS_INFO("push_back end");
-                    }
-                  }
-                }
-              }
-            }
-          }
-          */
 
           // publish frontier grid as marker
-          ROS_INFO_STREAM("push_back end " << frontierNodesVis.markers[0].points.size());
+          ROS_INFO_STREAM("marker size: " << frontierNodesVis.markers[0].points.size());
           double size = m_octreeContact->getNodeSize(m_maxTreeDepth);
           frontierNodesVis.markers[0].header.frame_id = m_worldFrameId;
           frontierNodesVis.markers[0].header.stamp = rostime;
@@ -857,7 +799,6 @@ namespace jsk_pcl_ros
             frontierNodesVis.markers[0].action = visualization_msgs::Marker::DELETE;
           }
 
-          ROS_INFO("777777777777777777777");
           m_fromarkerPub.publish(frontierNodesVis);
 
           // publish frontier grid as pointcloud
@@ -870,7 +811,6 @@ namespace jsk_pcl_ros
         }
       }
     }
-             //
 
     // finish pointcloud:
     if (publishPointCloud) {
