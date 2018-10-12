@@ -728,14 +728,15 @@ namespace jsk_pcl_ros
       unknownRosCloud.header.stamp = rostime;
       m_unknownPointCloudPub.publish(unknownRosCloud);
 
-      //
       // publish frontier grid as marker
       if (publishFrontierMarkerArray) {
         if (publishFrontierMarkerArray) {
           visualization_msgs::MarkerArray frontierNodesVis;
           frontierNodesVis.markers.resize(1);
           pcl::PointCloud<pcl::PointXYZ> frontierCloud;
-          // std::vector<bool> check(m_occupancyMaxX - m_occupancyMinX, m_occupancyMinY, m_occupancyMinZ)
+          double resolution = m_octreeContact->getResolution();
+          double size_unknown = resolution;
+          // std::vector<bool> check(((m_occupancyMaxX - m_occupancyMinX) / resolution) * ((m_occupancyMaxY - m_occupancyMinY) / resolution) * ((m_occupancyMaxZ - m_occupancyMinZ) / resolution))
 
           for (OcTree::iterator it_free = m_octreeContact->begin(m_maxTreeDepth), end = m_octreeContact->end(); it_free != end; ++it_free) {
             if (m_octreeContact->isNodeFree(*it_free)) {
@@ -744,36 +745,32 @@ namespace jsk_pcl_ros
               double z_free = it_free.getZ();
               double size_free = it_free.getSize();
 
-              if (x_free > m_occupancyMinX && x_free < m_occupancyMaxX && y_free > m_occupancyMinY && y_free < m_occupancyMaxY && z_free > m_occupancyMinZ && z_free < m_occupancyMaxZ) {
-                for (point3d_list::iterator it_unknown = unknownLeaves.begin();
-                     it_unknown != unknownLeaves.end();
-                     it_unknown++) {
-                  double x_unknown = it_unknown->x();
-                  double y_unknown = it_unknown->y();
-                  double z_unknown = it_unknown->z();
-                  double size_unknown = m_octreeContact->getResolution();
+              for (point3d_list::iterator it_unknown = unknownLeaves.begin();
+                   it_unknown != unknownLeaves.end();
+                   it_unknown++) {
+                double x_unknown = it_unknown->x();
+                double y_unknown = it_unknown->y();
+                double z_unknown = it_unknown->z();
 
-                  geometry_msgs::Point cubeCenter;
-                  cubeCenter.x = x_unknown;
-                  cubeCenter.y = y_unknown;
-                  cubeCenter.z = z_unknown;
+                geometry_msgs::Point cubeCenter;
+                cubeCenter.x = x_unknown;
+                cubeCenter.y = y_unknown;
+                cubeCenter.z = z_unknown;
 
-                  double distance = size_free / 2.0 + size_unknown / 2.0;
+                double distance = size_free / 2.0 + size_unknown / 2.0;
+                double x_diff = std::abs(x_unknown - x_free);
+                double y_diff = std::abs(y_unknown - y_free);
+                double z_diff = std::abs(z_unknown - z_free);
 
-                  double x_diff = std::abs(x_unknown - x_free);
-                  double y_diff = std::abs(y_unknown - y_free);
-                  double z_diff = std::abs(z_unknown - z_free);
-
-                  if (std::abs(distance - std::max(z_diff, std::max(x_diff, y_diff))) < size_unknown / 2.0 + 0.0001) {
-                    if (m_useHeightMap) {
-                      double minX, minY, minZ, maxX, maxY, maxZ;
-                      m_octreeContact->getMetricMin(minX, minY, minZ);
-                      m_octreeContact->getMetricMax(maxX, maxY, maxZ);
-                      double h = (1.0 - std::min(std::max((cubeCenter.z-minZ)/ (maxZ - minZ), 0.0), 1.0)) *m_colorFactor;
-                      frontierNodesVis.markers[0].colors.push_back(heightMapColor(h));
-                    }
-                    frontierNodesVis.markers[0].points.push_back(cubeCenter);
+                if (std::abs(distance - std::max(z_diff, std::max(x_diff, y_diff))) < size_unknown / 2.0 + 0.0001) {
+                  if (m_useHeightMap) {
+                    double minX, minY, minZ, maxX, maxY, maxZ;
+                    m_octreeContact->getMetricMin(minX, minY, minZ);
+                    m_octreeContact->getMetricMax(maxX, maxY, maxZ);
+                    double h = (1.0 - std::min(std::max((cubeCenter.z-minZ)/ (maxZ - minZ), 0.0), 1.0)) *m_colorFactor;
+                    frontierNodesVis.markers[0].colors.push_back(heightMapColor(h));
                   }
+                  frontierNodesVis.markers[0].points.push_back(cubeCenter);
                 }
               }
             }
