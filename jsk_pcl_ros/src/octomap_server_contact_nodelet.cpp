@@ -829,6 +829,8 @@ namespace jsk_pcl_ros
         double size = m_octreeContact->getNodeSize(m_maxTreeDepth);
         frontierNodesVis.markers[0].header.frame_id = m_worldFrameId;
         frontierNodesVis.markers[0].header.stamp = rostime;
+        // ros::Duration t = ros::Time::now() - rostime;
+        // ROS_INFO_STREAM("delay: " << t.toSec() << "." << t.toNSec());
         frontierNodesVis.markers[0].ns = m_worldFrameId;
         frontierNodesVis.markers[0].id = 0;
         frontierNodesVis.markers[0].type = visualization_msgs::Marker::CUBE_LIST;
