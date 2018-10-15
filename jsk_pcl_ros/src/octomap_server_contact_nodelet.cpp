@@ -81,23 +81,23 @@ namespace jsk_pcl_ros
 
     privateNh.param("use_vertex", m_useVertex,m_useVertex);
 
-    double u_r, u_g, u_b, u_a, fro_r, fro_g, fro_b, fro_a;
-    privateNh.param("color_unknown/r", u_r, 0.5);
-    privateNh.param("color_unknown/g", u_g, 0.5);
-    privateNh.param("color_unknown/b", u_b, 0.7);
-    privateNh.param("color_unknown/a", u_a, 1.0);
-    privateNh.param("color_frontier/r", fro_r, 1.0);
-    privateNh.param("color_frontier/g", fro_g, 0.0);
-    privateNh.param("color_frontier/b", fro_b, 0.0);
-    privateNh.param("color_frontier/a", fro_a, 1.0);
-    m_colorUnknown.r = u_r;
-    m_colorUnknown.g = u_g;
-    m_colorUnknown.b = u_b;
-    m_colorUnknown.a = u_a;
-    m_colorFrontier.r = fro_r;
-    m_colorFrontier.g = fro_g;
-    m_colorFrontier.b = fro_b;
-    m_colorFrontier.a = fro_a;
+    double r, g, b, a;
+    privateNh.param("color_unknown/r", r, 0.5);
+    privateNh.param("color_unknown/g", g, 0.5);
+    privateNh.param("color_unknown/b", b, 0.7);
+    privateNh.param("color_unknown/a", a, 1.0);
+    m_colorUnknown.r = r;
+    m_colorUnknown.g = g;
+    m_colorUnknown.b = b;
+    m_colorUnknown.a = a;
+    privateNh.param("color_frontier/r", r, 1.0);
+    privateNh.param("color_frontier/g", g, 0.0);
+    privateNh.param("color_frontier/b", b, 0.0);
+    privateNh.param("color_frontier/a", a, 1.0);
+    m_colorFrontier.r = r;
+    m_colorFrontier.g = g;
+    m_colorFrontier.b = b;
+    m_colorFrontier.a = a;
 
     m_unknownPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("octomap_unknown_point_cloud_centers", 1, m_latchedTopics);
     m_umarkerPub = m_nh.advertise<visualization_msgs::MarkerArray>("unknown_cells_vis_array", 1, m_latchedTopics);
@@ -734,12 +734,10 @@ namespace jsk_pcl_ros
         frontierNodesVis.markers.resize(1);
         pcl::PointCloud<pcl::PointXYZ> frontierCloud;
         double resolution = m_octreeContact->getResolution();
-        double size_unknown = resolution;
         // how many resolution-size grids are in one edge
         int x_num = int(((m_occupancyMaxX - m_occupancyMinX) / resolution));
         int y_num = int(((m_occupancyMaxY - m_occupancyMinY) / resolution));
         int z_num = int(((m_occupancyMaxZ - m_occupancyMinZ) / resolution));
-        // ROS_INFO_STREAM("x: " << x_num << " y: " << y_num << " z: " << z_num);
         std::vector< std::vector< std::vector<int> > > check_unknown(x_num, std::vector< std::vector<int> >(y_num, std::vector<int>(z_num)));
         for (int i=0; i<x_num; i++) {
           for (int j=0; j<y_num; j++) {
@@ -748,16 +746,23 @@ namespace jsk_pcl_ros
             }
           }
         }
-        std::vector< std::vector< std::vector<int> > > check_free(x_num, std::vector< std::vector<int> >(y_num, std::vector<int>(z_num)));
+        std::vector< std::vector< std::vector<int> > > check_occupied(x_num, std::vector< std::vector<int> >(y_num, std::vector<int>(z_num)));
         for (int i=0; i<x_num; i++) {
           for (int j=0; j<y_num; j++) {
             for (int k=0; k<z_num; k++) {
-              check_free[i][j][k] = 0;
+              check_occupied[i][j][k] = 0;
+            }
+          }
+        }
+        std::vector< std::vector< std::vector<int> > > check_frontier(x_num, std::vector< std::vector<int> >(y_num, std::vector<int>(z_num)));
+        for (int i=0; i<x_num; i++) {
+          for (int j=0; j<y_num; j++) {
+            for (int k=0; k<z_num; k++) {
+              check_frontier[i][j][k] = 0;
             }
           }
         }
 
-        ROS_WARN("start process unknown grids");
         // for all unknown grids, store its information to array
         for (point3d_list::iterator it_unknown = unknownLeaves.begin();
              it_unknown != unknownLeaves.end();
@@ -766,53 +771,57 @@ namespace jsk_pcl_ros
           double x_unknown = it_unknown->x();
           double y_unknown = it_unknown->y();
           double z_unknown = it_unknown->z();
-          // ROS_INFO_STREAM("x_u: " << int(std::round((x_unknown - m_occupancyMinX) / resolution - 1)) << " y_u: " << int(std::round((y_unknown - m_occupancyMinY) / resolution - 1)) << " z_u: " << int(std::round((z_unknown - m_occupancyMinZ) / resolution - 1)));
           check_unknown[int(std::round((x_unknown - m_occupancyMinX) / resolution - 1))][int(std::round((y_unknown - m_occupancyMinY) / resolution - 1))][int(std::round((z_unknown - m_occupancyMinZ) / resolution - 1))] = 1;
         }
 
-        ROS_WARN("start process free grids");
-        // for all free grids, devide them into resolution size grids,
-        // and check whether they are adjecent to unknown grids
-        for (OcTree::iterator it_free = m_octreeContact->begin(m_maxTreeDepth), end = m_octreeContact->end(); it_free != end; ++it_free) {
-          if (m_octreeContact->isNodeFree(*it_free)) {
-            // get center of free grids
-            double x_free = it_free.getX();
-            double y_free = it_free.getY();
-            double z_free = it_free.getZ();
-            double size_free = it_free.getSize();
-            int x_min_index = int((x_free - (size_free / 2.0) - m_occupancyMinX) / size_free);
-            int y_min_index = int((y_free - (size_free / 2.0) - m_occupancyMinY) / size_free);
-            int z_min_index = int((z_free - (size_free / 2.0) - m_occupancyMinZ) / size_free);
-            geometry_msgs::Point cubeCenter;
-            // check adjacent grids
-            // consider slightly larger region of free grids, because free grids and unknown grids are displaced half
-            for (int i=x_min_index-1; i<=x_min_index+int(size_free/resolution); i++) {
-              for (int j=y_min_index-1; j<=y_min_index+int(size_free/resolution); j++) {
-                for (int k=z_min_index-1; k<=z_min_index+int(size_free/resolution); k++) {
-                  for (int l=-1; l<=1; l++) {
-                    if ( 0 <= i+l && i+l < x_num) {
-                      for (int m=-1; m<=1; m++) {
-                        if ( 0 <= j+m && j+m < y_num) {
-                          for (int n=-1; n<=1; n++) {
-                            if ( 0 <= k+n && k+n < z_num) {
-                              if ((l == 0 && m == 0 && n== 0) ||
-                                  i < 0 || i >= x_num || j < 0 || j >= y_num || k < 0 || k >= z_num)
-                                continue;
-                              if (check_unknown[i+l][j+m][k+n] == 1 && check_unknown[i][j][k] == 0 && check_free[i][j][k] == 0) {
-                                check_free[i][j][k] = 1;  // avoid check same free grids more than once
-                                cubeCenter.x = (i+0.5)*resolution + m_occupancyMinX;
-                                cubeCenter.y = (j+0.5)*resolution + m_occupancyMinY;
-                                cubeCenter.z = (k+0.5)*resolution + m_occupancyMinZ;
-                                if (m_useHeightMap) {
-                                  double minX, minY, minZ, maxX, maxY, maxZ;
-                                  m_octreeContact->getMetricMin(minX, minY, minZ);
-                                  m_octreeContact->getMetricMax(maxX, maxY, maxZ);
-                                  double h = (1.0 - std::min(std::max((cubeCenter.z-minZ)/ (maxZ - minZ), 0.0), 1.0)) *m_colorFactor;
-                                  frontierNodesVis.markers[0].colors.push_back(heightMapColor(h));
-                                }
-                                frontierNodesVis.markers[0].points.push_back(cubeCenter);
-                              }
+        // for all occupied grids, store its information to array
+        for (int idx=0; idx<occupiedNodesVis.markers.size(); idx++) {
+          double size_occupied = occupiedNodesVis.markers[idx].scale.x;
+          for (int id=0; id<occupiedNodesVis.markers[idx].points.size(); id++) {
+            double x_occupied = occupiedNodesVis.markers[idx].points[id].x;
+            double y_occupied = occupiedNodesVis.markers[idx].points[id].y;
+            double z_occupied = occupiedNodesVis.markers[idx].points[id].z;
+            int x_min_index = std::round((x_occupied - (size_occupied / 2.0) - m_occupancyMinX) / size_occupied);
+            int y_min_index = std::round((y_occupied - (size_occupied / 2.0) - m_occupancyMinY) / size_occupied);
+            int z_min_index = std::round((z_occupied - (size_occupied / 2.0) - m_occupancyMinZ) / size_occupied);
+            for (int i=x_min_index; i<x_min_index+int(size_occupied/resolution); i++) {
+              for (int j=y_min_index; j<y_min_index+int(size_occupied/resolution); j++) {
+                for (int k=z_min_index; k<z_min_index+int(size_occupied/resolution); k++) {
+                  check_occupied[i][j][k] = 1;
+                }
+              }
+            }
+          }
+        }
+
+        // for all grids except occupied and unknown, (NOTE there are grids which are not free, nor occupied, nor unknown)
+        // check whether they are frontier, namely, adjecent to unknown grids
+        // NOTE all unknown grids are displaced half from the other grids
+        geometry_msgs::Point cubeCenter;
+        for (int i=0; i<x_num; i++) {
+          for (int j=0; j<y_num; j++) {
+            for (int k=0; k<z_num-1; k++) {
+              for (int l=-1; l<=1; l++) {
+                if ( 0 <= i+l && i+l < x_num) {
+                  for (int m=-1; m<=1; m++) {
+                    if ( 0 <= j+m && j+m < y_num) {
+                      for (int n=-1; n<=1; n++) {
+                        if ( 0 <= k+n && k+n < z_num) {
+                          if (l == 0 && m == 0 && n== 0)
+                            continue;
+                          if (check_unknown[i+l][j+m][k+n] == 1 && check_unknown[i][j][k] == 0 && check_occupied[i][j][k] == 0 && check_frontier[i][j][k] == 0) {
+                            check_frontier[i][j][k] = 1;
+                            cubeCenter.x = (i+0.5)*resolution + m_occupancyMinX;
+                            cubeCenter.y = (j+0.5)*resolution + m_occupancyMinY;
+                            cubeCenter.z = (k+0.5)*resolution + m_occupancyMinZ;
+                            if (m_useHeightMap) {
+                              double minX, minY, minZ, maxX, maxY, maxZ;
+                              m_octreeContact->getMetricMin(minX, minY, minZ);
+                              m_octreeContact->getMetricMax(maxX, maxY, maxZ);
+                              double h = (1.0 - std::min(std::max((cubeCenter.z-minZ)/ (maxZ - minZ), 0.0), 1.0)) *m_colorFactor;
+                              frontierNodesVis.markers[0].colors.push_back(heightMapColor(h));
                             }
+                            frontierNodesVis.markers[0].points.push_back(cubeCenter);
                           }
                         }
                       }
