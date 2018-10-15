@@ -785,32 +785,32 @@ namespace jsk_pcl_ros
             int z_min_index = int((z_free - (size_free / 2.0) - m_occupancyMinZ) / size_free);
             geometry_msgs::Point cubeCenter;
             // check adjacent grids
-            for (int i=x_min_index; i<x_min_index+int(size_free/resolution); i++) {
-              for (int j=y_min_index; j<y_min_index+int(size_free/resolution); j++) {
-                for (int k=z_min_index; k<z_min_index+int(size_free/resolution); k++) {
-                  if (check_free[i][j][k] == 0) {
-                    for (int l=-1; l<=1; l++) {
-                      if ( 0 <= i+l && i+l < x_num) {
-                        for (int m=-1; m<=1; m++) {
-                          if ( 0 <= j+m && j+m < y_num) {
-                            for (int n=-1; n<=1; n++) {
-                              if ( 0 <= k+n && k+n < z_num) {
-                                if (l == 0 && m == 0 && n== 0)
-                                  continue;
-                                if (check_unknown[i+l][j+m][k+n] == 1) {
-                                  check_free[i][j][k] = 1;  // avoid check same free grids more than once
-                                  cubeCenter.x = (i+0.5)*resolution + m_occupancyMinX;
-                                  cubeCenter.y = (j+0.5)*resolution + m_occupancyMinY;
-                                  cubeCenter.z = (k+0.5)*resolution + m_occupancyMinZ;
-                                  if (m_useHeightMap) {
-                                    double minX, minY, minZ, maxX, maxY, maxZ;
-                                    m_octreeContact->getMetricMin(minX, minY, minZ);
-                                    m_octreeContact->getMetricMax(maxX, maxY, maxZ);
-                                    double h = (1.0 - std::min(std::max((cubeCenter.z-minZ)/ (maxZ - minZ), 0.0), 1.0)) *m_colorFactor;
-                                    frontierNodesVis.markers[0].colors.push_back(heightMapColor(h));
-                                  }
-                                  frontierNodesVis.markers[0].points.push_back(cubeCenter);
+            // consider slightly larger region of free grids, because free grids and unknown grids are displaced half
+            for (int i=x_min_index-1; i<=x_min_index+int(size_free/resolution); i++) {
+              for (int j=y_min_index-1; j<=y_min_index+int(size_free/resolution); j++) {
+                for (int k=z_min_index-1; k<=z_min_index+int(size_free/resolution); k++) {
+                  for (int l=-1; l<=1; l++) {
+                    if ( 0 <= i+l && i+l < x_num) {
+                      for (int m=-1; m<=1; m++) {
+                        if ( 0 <= j+m && j+m < y_num) {
+                          for (int n=-1; n<=1; n++) {
+                            if ( 0 <= k+n && k+n < z_num) {
+                              if ((l == 0 && m == 0 && n== 0) ||
+                                  i < 0 || i >= x_num || j < 0 || j >= y_num || k < 0 || k >= z_num)
+                                continue;
+                              if (check_unknown[i+l][j+m][k+n] == 1 && check_unknown[i][j][k] == 0 && check_free[i][j][k] == 0) {
+                                check_free[i][j][k] = 1;  // avoid check same free grids more than once
+                                cubeCenter.x = (i+0.5)*resolution + m_occupancyMinX;
+                                cubeCenter.y = (j+0.5)*resolution + m_occupancyMinY;
+                                cubeCenter.z = (k+0.5)*resolution + m_occupancyMinZ;
+                                if (m_useHeightMap) {
+                                  double minX, minY, minZ, maxX, maxY, maxZ;
+                                  m_octreeContact->getMetricMin(minX, minY, minZ);
+                                  m_octreeContact->getMetricMax(maxX, maxY, maxZ);
+                                  double h = (1.0 - std::min(std::max((cubeCenter.z-minZ)/ (maxZ - minZ), 0.0), 1.0)) *m_colorFactor;
+                                  frontierNodesVis.markers[0].colors.push_back(heightMapColor(h));
                                 }
+                                frontierNodesVis.markers[0].points.push_back(cubeCenter);
                               }
                             }
                           }
