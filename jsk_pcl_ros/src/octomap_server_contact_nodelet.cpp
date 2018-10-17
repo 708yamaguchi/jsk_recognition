@@ -781,9 +781,12 @@ namespace jsk_pcl_ros
             double x_occupied = occupiedNodesVis.markers[idx].points[id].x;
             double y_occupied = occupiedNodesVis.markers[idx].points[id].y;
             double z_occupied = occupiedNodesVis.markers[idx].points[id].z;
-            int x_min_index = std::round((x_occupied - (size_occupied / 2.0) - m_occupancyMinX) / size_occupied);
-            int y_min_index = std::round((y_occupied - (size_occupied / 2.0) - m_occupancyMinY) / size_occupied);
-            int z_min_index = std::round((z_occupied - (size_occupied / 2.0) - m_occupancyMinZ) / size_occupied);
+            // int x_min_index = std::round((x_occupied - (size_occupied / 2.0) - m_occupancyMinX) / size_occupied);
+            // int y_min_index = std::round((y_occupied - (size_occupied / 2.0) - m_occupancyMinY) / size_occupied);
+            // int z_min_index = std::round((z_occupied - (size_occupied / 2.0) - m_occupancyMinZ) / size_occupied);
+            int x_min_index = std::round((x_occupied - (size_occupied / 2.0) - m_occupancyMinX) / resolution);
+            int y_min_index = std::round((y_occupied - (size_occupied / 2.0) - m_occupancyMinY) / resolution);
+            int z_min_index = std::round((z_occupied - (size_occupied / 2.0) - m_occupancyMinZ) / resolution);
             for (int i=x_min_index; i<x_min_index+int(size_occupied/resolution); i++) {
               for (int j=y_min_index; j<y_min_index+int(size_occupied/resolution); j++) {
                 for (int k=z_min_index; k<z_min_index+int(size_occupied/resolution); k++) {
