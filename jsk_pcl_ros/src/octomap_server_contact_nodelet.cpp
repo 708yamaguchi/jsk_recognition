@@ -105,6 +105,9 @@ namespace jsk_pcl_ros
     m_frontierPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("octomap_frontier_point_cloud_centers", 1, m_latchedTopics);
     m_fromarkerPub = m_nh.advertise<visualization_msgs::MarkerArray>("frontier_cells_vis_array", 1, m_latchedTopics);
 
+    m_octomap2dPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("octomap2d_point_cloud_centers", 1, m_latchedTopics);
+    m_2dmarkerPub = m_nh.advertise<visualization_msgs::MarkerArray>("octomap2d_cells_vis_array", 1, m_latchedTopics);
+
     m_pointProximitySub = new message_filters::Subscriber<sensor_msgs::PointCloud2> (m_nh, "proximity_in", 5);
     m_tfPointProximitySub = new tf::MessageFilter<sensor_msgs::PointCloud2> (*m_pointProximitySub, m_tfListener, m_worldFrameId, 5);
     m_tfPointProximitySub->registerCallback(boost::bind(&OctomapServerContact::insertProximityCallback, this, _1));
@@ -499,6 +502,7 @@ namespace jsk_pcl_ros
     bool publishFreeMarkerArray = m_publishFreeSpace && (m_latchedTopics || m_fmarkerPub.getNumSubscribers() > 0);
     bool publishUnknownMarkerArray = m_publishUnknownSpace && (m_latchedTopics || m_umarkerPub.getNumSubscribers() > 0);
     bool publishFrontierMarkerArray = m_publishFrontierSpace && (m_latchedTopics || m_fromarkerPub.getNumSubscribers() > 0);
+    bool publishoctomap2dMarkerArray = m_publishFrontierSpace && (m_latchedTopics || m_2dmarkerPub.getNumSubscribers() > 0);
     bool publishMarkerArray = (m_latchedTopics || m_markerPub.getNumSubscribers() > 0);
     bool publishPointCloud = (m_latchedTopics || m_pointCloudPub.getNumSubscribers() > 0);
     bool publishBinaryMap = (m_latchedTopics || m_binaryMapPub.getNumSubscribers() > 0);
@@ -866,6 +870,63 @@ namespace jsk_pcl_ros
         frontierRosCloud.header.frame_id = m_worldFrameId;
         frontierRosCloud.header.stamp = rostime;
         m_frontierPointCloudPub.publish(frontierRosCloud);
+
+        // publish 2D octomap
+        visualization_msgs::MarkerArray octomap2dNodesVis;
+        octomap2dNodesVis.markers.resize(2);
+        std_msgs::ColorRGBA colorOccupied;
+        colorOccupied.r = 0.0;
+        colorOccupied.g = 0.0;
+        colorOccupied.b = 1.0;
+        colorOccupied.a = 1.0;
+        octomap2dNodesVis.markers[0].color = colorOccupied;
+        octomap2dNodesVis.markers[1].color = m_colorFrontier;
+        for (int i = 0; i < 2; i++) {
+          octomap2dNodesVis.markers[i].header.frame_id = m_worldFrameId;
+          octomap2dNodesVis.markers[i].header.stamp = rostime;
+          octomap2dNodesVis.markers[i].ns = m_worldFrameId;
+          octomap2dNodesVis.markers[i].id = i;
+          octomap2dNodesVis.markers[i].type = visualization_msgs::Marker::CUBE_LIST;
+          octomap2dNodesVis.markers[i].scale.x = resolution;
+          octomap2dNodesVis.markers[i].scale.y = resolution;
+          octomap2dNodesVis.markers[i].scale.z = resolution;
+        }
+
+        // check_octomap2d: 0: others, 1: occupied, 2: frontier
+        std::vector< std::vector<int> > check_octomap2d(x_num, std::vector<int>(y_num));
+        for (int i=0; i<x_num; i++) {
+          for (int j=0; j<y_num; j++) {
+            check_octomap2d[i][j] = 0;
+          }
+        }
+
+        for (int i=0; i<x_num; i++) {
+          for (int j=0; j<y_num; j++) {
+            // first, check occupied or not
+            for (int k=0; k<z_num; k++) {
+              if (check_octomap2d[i][j] == 1) continue;
+              if (check_occupied[i][j][k] == 1) {
+                check_octomap2d[i][j] = 1;
+                cubeCenter.x = (i+0.5)*resolution + m_occupancyMinX;
+                cubeCenter.y = (j+0.5)*resolution + m_occupancyMinY;
+                cubeCenter.z = m_occupancyMinZ - resolution; // display octomap2d below octomap
+                octomap2dNodesVis.markers[0].points.push_back(cubeCenter);
+              }
+            }
+            // second, check frontier or not
+            for (int k=0; k<z_num; k++) {
+              if (check_octomap2d[i][j] == 1 || check_octomap2d[i][j] == 2) continue;
+              if (check_frontier[i][j][k] == 1) {
+                check_octomap2d[i][j] = 2;
+                cubeCenter.x = (i+0.5)*resolution + m_occupancyMinX;
+                cubeCenter.y = (j+0.5)*resolution + m_occupancyMinY;
+                cubeCenter.z = m_occupancyMinZ - resolution; // display octomap2d below octomap
+                octomap2dNodesVis.markers[1].points.push_back(cubeCenter);
+              }
+            }
+          }
+        }
+        m_2dmarkerPub.publish(octomap2dNodesVis);
       }
     }
 
