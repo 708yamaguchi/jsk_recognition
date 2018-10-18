@@ -105,6 +105,8 @@ namespace jsk_pcl_ros
     m_frontierPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("octomap_frontier_point_cloud_centers", 1, m_latchedTopics);
     m_fromarkerPub = m_nh.advertise<visualization_msgs::MarkerArray>("frontier_cells_vis_array", 1, m_latchedTopics);
 
+    m_occupiedPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("octomap_occupied_point_cloud_centers", 1, m_latchedTopics);
+
     m_octomap2dPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("octomap2d_point_cloud_centers", 1, m_latchedTopics);
     m_2dmarkerPub = m_nh.advertise<visualization_msgs::MarkerArray>("octomap2d_cells_vis_array", 1, m_latchedTopics);
 
@@ -779,6 +781,7 @@ namespace jsk_pcl_ros
         }
 
         // for all occupied grids, store its information to array
+        pcl::PointCloud<pcl::PointXYZ> occupiedCloud;
         for (int idx=0; idx<occupiedNodesVis.markers.size(); idx++) {
           double size_occupied = occupiedNodesVis.markers[idx].scale.x;
           for (int id=0; id<occupiedNodesVis.markers[idx].points.size(); id++) {
@@ -795,6 +798,9 @@ namespace jsk_pcl_ros
               for (int j=y_min_index; j<y_min_index+int(size_occupied/resolution); j++) {
                 for (int k=z_min_index; k<z_min_index+int(size_occupied/resolution); k++) {
                   check_occupied[i][j][k] = 1;
+                  occupiedCloud.push_back(pcl::PointXYZ((i+0.5)*resolution + m_occupancyMinX,
+                                                        (j+0.5)*resolution + m_occupancyMinY,
+                                                        (k+0.5)*resolution + m_occupancyMinZ));
                 }
               }
             }
@@ -821,6 +827,7 @@ namespace jsk_pcl_ros
                             cubeCenter.x = (i+0.5)*resolution + m_occupancyMinX;
                             cubeCenter.y = (j+0.5)*resolution + m_occupancyMinY;
                             cubeCenter.z = (k+0.5)*resolution + m_occupancyMinZ;
+                            frontierCloud.push_back(pcl::PointXYZ((float)cubeCenter.x, (float)cubeCenter.y, (float)cubeCenter.z));
                             if (m_useHeightMap) {
                               double minX, minY, minZ, maxX, maxY, maxZ;
                               m_octreeContact->getMetricMin(minX, minY, minZ);
@@ -870,6 +877,14 @@ namespace jsk_pcl_ros
         frontierRosCloud.header.frame_id = m_worldFrameId;
         frontierRosCloud.header.stamp = rostime;
         m_frontierPointCloudPub.publish(frontierRosCloud);
+
+        // publish occupied grid as pointcloud
+        sensor_msgs::PointCloud2 occupiedRosCloud;
+        pcl::toROSMsg (occupiedCloud, occupiedRosCloud);
+        occupiedRosCloud.header.frame_id = m_worldFrameId;
+        occupiedRosCloud.header.stamp = rostime;
+        m_occupiedPointCloudPub.publish(occupiedRosCloud);
+
 
         // publish 2D octomap
         visualization_msgs::MarkerArray octomap2dNodesVis;
