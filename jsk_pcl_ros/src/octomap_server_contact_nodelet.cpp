@@ -90,9 +90,9 @@ namespace jsk_pcl_ros
     m_colorUnknown.g = g;
     m_colorUnknown.b = b;
     m_colorUnknown.a = a;
-    privateNh.param("color_frontier/r", r, 1.0);
-    privateNh.param("color_frontier/g", g, 0.0);
-    privateNh.param("color_frontier/b", b, 0.0);
+    privateNh.param("color_frontier/r", r, 0.9);
+    privateNh.param("color_frontier/g", g, 0.6);
+    privateNh.param("color_frontier/b", b, 0.6);
     privateNh.param("color_frontier/a", a, 1.0);
     m_colorFrontier.r = r;
     m_colorFrontier.g = g;
@@ -107,8 +107,10 @@ namespace jsk_pcl_ros
 
     m_occupiedPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("octomap_occupied_point_cloud_centers", 1, m_latchedTopics);
 
-    m_octomap2dPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("octomap2d_point_cloud_centers", 1, m_latchedTopics);
-    m_2dmarkerPub = m_nh.advertise<visualization_msgs::MarkerArray>("octomap2d_cells_vis_array", 1, m_latchedTopics);
+    // m_octomap2dPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("octomap2d_point_cloud_centers", 1, m_latchedTopics);
+    // m_2dmarkerPub = m_nh.advertise<visualization_msgs::MarkerArray>("octomap2d_cells_vis_array", 1, m_latchedTopics);
+    m_potentialPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("potential_point_cloud_centers", 1, m_latchedTopics);
+    m_pmarkerPub = m_nh.advertise<visualization_msgs::MarkerArray>("potential_cells_vis_array", 1, m_latchedTopics);
 
     m_pointProximitySub = new message_filters::Subscriber<sensor_msgs::PointCloud2> (m_nh, "proximity_in", 5);
     m_tfPointProximitySub = new tf::MessageFilter<sensor_msgs::PointCloud2> (*m_pointProximitySub, m_tfListener, m_worldFrameId, 5);
@@ -504,12 +506,12 @@ namespace jsk_pcl_ros
     bool publishFreeMarkerArray = m_publishFreeSpace && (m_latchedTopics || m_fmarkerPub.getNumSubscribers() > 0);
     bool publishUnknownMarkerArray = m_publishUnknownSpace && (m_latchedTopics || m_umarkerPub.getNumSubscribers() > 0);
     bool publishFrontierMarkerArray = m_publishFrontierSpace && (m_latchedTopics || m_fromarkerPub.getNumSubscribers() > 0);
-    bool publishoctomap2dMarkerArray = m_publishFrontierSpace && (m_latchedTopics || m_2dmarkerPub.getNumSubscribers() > 0);
+    // bool publishoctomap2dMarkerArray = m_publishFrontierSpace && (m_latchedTopics || m_2dmarkerPub.getNumSubscribers() > 0);
+    bool publishpotentialMarkerArray = m_publishFrontierSpace && (m_latchedTopics || m_pmarkerPub.getNumSubscribers() > 0);
     bool publishMarkerArray = (m_latchedTopics || m_markerPub.getNumSubscribers() > 0);
     bool publishPointCloud = (m_latchedTopics || m_pointCloudPub.getNumSubscribers() > 0);
     bool publishBinaryMap = (m_latchedTopics || m_binaryMapPub.getNumSubscribers() > 0);
     bool publishFullMap = (m_latchedTopics || m_fullMapPub.getNumSubscribers() > 0);
-    m_publish2DMap = (m_latchedTopics || m_mapPub.getNumSubscribers() > 0);
 
     // init markers for free space:
     visualization_msgs::MarkerArray freeNodesVis;
@@ -739,6 +741,9 @@ namespace jsk_pcl_ros
         visualization_msgs::MarkerArray frontierNodesVis;
         frontierNodesVis.markers.resize(1);
         pcl::PointCloud<pcl::PointXYZ> frontierCloud;
+        visualization_msgs::MarkerArray potentialNodesVis;
+        potentialNodesVis.markers.resize(1);
+        pcl::PointCloud<pcl::PointXYZ> potentialCloud;
         double resolution = m_octreeContact->getResolution();
         // how many resolution-size grids are in one edge
         int x_num = int(((m_occupancyMaxX - m_occupancyMinX) / resolution));
@@ -765,6 +770,14 @@ namespace jsk_pcl_ros
           for (int j=0; j<y_num; j++) {
             for (int k=0; k<z_num; k++) {
               check_frontier[i][j][k] = 0;
+            }
+          }
+        }
+        std::vector< std::vector< std::vector<int> > > check_potential(x_num, std::vector< std::vector<int> >(y_num, std::vector<int>(z_num)));
+        for (int i=0; i<x_num; i++) {
+          for (int j=0; j<y_num; j++) {
+            for (int k=0; k<z_num; k++) {
+              check_potential[i][j][k] = 0;
             }
           }
         }
@@ -837,6 +850,11 @@ namespace jsk_pcl_ros
                             }
                             frontierNodesVis.markers[0].points.push_back(cubeCenter);
                           }
+                          if (check_frontier[i][j][k] == 1 && check_occupied[i+l][j+m][k+n] == 1) {
+                            check_potential[i][j][k] = 1;
+                            potentialCloud.push_back(pcl::PointXYZ((float)cubeCenter.x, (float)cubeCenter.y, (float)cubeCenter.z));
+                            potentialNodesVis.markers[0].points.push_back(cubeCenter);
+                          }
                         }
                       }
                     }
@@ -861,22 +879,36 @@ namespace jsk_pcl_ros
         frontierNodesVis.markers[0].scale.y = size;
         frontierNodesVis.markers[0].scale.z = size;
         frontierNodesVis.markers[0].color = m_colorFrontier;
-
         if (frontierNodesVis.markers[0].points.size() > 0) {
           frontierNodesVis.markers[0].action = visualization_msgs::Marker::ADD;
         }
         else {
           frontierNodesVis.markers[0].action = visualization_msgs::Marker::DELETE;
         }
-
         m_fromarkerPub.publish(frontierNodesVis);
 
-        // publish frontier grid as pointcloud
-        sensor_msgs::PointCloud2 frontierRosCloud;
-        pcl::toROSMsg (frontierCloud, frontierRosCloud);
-        frontierRosCloud.header.frame_id = m_worldFrameId;
-        frontierRosCloud.header.stamp = rostime;
-        m_frontierPointCloudPub.publish(frontierRosCloud);
+        // publish potential grid as marker
+        potentialNodesVis.markers[0].header.frame_id = m_worldFrameId;
+        potentialNodesVis.markers[0].header.stamp = rostime;
+        potentialNodesVis.markers[0].ns = m_worldFrameId;
+        potentialNodesVis.markers[0].id = 0;
+        potentialNodesVis.markers[0].type = visualization_msgs::Marker::CUBE_LIST;
+        potentialNodesVis.markers[0].scale.x = size;
+        potentialNodesVis.markers[0].scale.y = size;
+        potentialNodesVis.markers[0].scale.z = size;
+        std_msgs::ColorRGBA colorPotential;
+        colorPotential.r = 1.0;
+        colorPotential.g = 0.0;
+        colorPotential.b = 0.0;
+        colorPotential.a = 1.0;
+        potentialNodesVis.markers[0].color = colorPotential;
+        if (potentialNodesVis.markers[0].points.size() > 0) {
+          potentialNodesVis.markers[0].action = visualization_msgs::Marker::ADD;
+        }
+        else {
+          potentialNodesVis.markers[0].action = visualization_msgs::Marker::DELETE;
+        }
+        m_pmarkerPub.publish(potentialNodesVis);
 
         // publish occupied grid as pointcloud
         sensor_msgs::PointCloud2 occupiedRosCloud;
@@ -885,7 +917,22 @@ namespace jsk_pcl_ros
         occupiedRosCloud.header.stamp = rostime;
         m_occupiedPointCloudPub.publish(occupiedRosCloud);
 
+        // publish frontier grid as pointcloud
+        sensor_msgs::PointCloud2 frontierRosCloud;
+        pcl::toROSMsg (frontierCloud, frontierRosCloud);
+        frontierRosCloud.header.frame_id = m_worldFrameId;
+        frontierRosCloud.header.stamp = rostime;
+        m_frontierPointCloudPub.publish(frontierRosCloud);
 
+        // publish potential grid as pointcloud
+        sensor_msgs::PointCloud2 potentialRosCloud;
+        pcl::toROSMsg (potentialCloud, potentialRosCloud);
+        potentialRosCloud.header.frame_id = m_worldFrameId;
+        potentialRosCloud.header.stamp = rostime;
+        m_potentialPointCloudPub.publish(potentialRosCloud);
+
+
+        /*
         // publish 2D octomap
         visualization_msgs::MarkerArray octomap2dNodesVis;
         octomap2dNodesVis.markers.resize(2);
@@ -942,6 +989,7 @@ namespace jsk_pcl_ros
           }
         }
         m_2dmarkerPub.publish(octomap2dNodesVis);
+        */
       }
     }
 

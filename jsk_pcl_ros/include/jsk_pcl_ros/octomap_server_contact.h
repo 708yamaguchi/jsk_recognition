@@ -70,7 +70,8 @@ namespace jsk_pcl_ros
      virtual void onInit();
      ros::Publisher m_unknownPointCloudPub, m_umarkerPub;
      ros::Publisher m_frontierPointCloudPub, m_fromarkerPub;
-    ros::Publisher m_occupiedPointCloudPub;
+     ros::Publisher m_potentialPointCloudPub, m_pmarkerPub;
+     ros::Publisher m_occupiedPointCloudPub;
      ros::Publisher m_octomap2dPointCloudPub, m_2dmarkerPub;
      message_filters::Subscriber<sensor_msgs::PointCloud2>* m_pointProximitySub;
      tf::MessageFilter<sensor_msgs::PointCloud2>* m_tfPointProximitySub;
@@ -80,6 +81,7 @@ namespace jsk_pcl_ros
 
      std_msgs::ColorRGBA m_colorUnknown;
      std_msgs::ColorRGBA m_colorFrontier;
+     std_msgs::ColorRGBA m_colorPotential;
 
      bool m_publishUnknownSpace;
      bool m_publishFrontierSpace;
