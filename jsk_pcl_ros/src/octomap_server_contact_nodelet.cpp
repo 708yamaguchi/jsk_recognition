@@ -109,7 +109,7 @@ namespace jsk_pcl_ros
 
     // m_octomap2dPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("octomap2d_point_cloud_centers", 1, m_latchedTopics);
     // m_2dmarkerPub = m_nh.advertise<visualization_msgs::MarkerArray>("octomap2d_cells_vis_array", 1, m_latchedTopics);
-    m_potentialPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("potential_point_cloud_centers", 1, m_latchedTopics);
+    m_potentialPointCloudPub = m_nh.advertise<sensor_msgs::PointCloud2>("octomap_potential_point_cloud_centers", 1, m_latchedTopics);
     m_pmarkerPub = m_nh.advertise<visualization_msgs::MarkerArray>("potential_cells_vis_array", 1, m_latchedTopics);
 
     m_pointProximitySub = new message_filters::Subscriber<sensor_msgs::PointCloud2> (m_nh, "proximity_in", 5);
@@ -866,7 +866,6 @@ namespace jsk_pcl_ros
         }
 
         // publish frontier grid as marker
-        ROS_INFO_STREAM("marker size: " << frontierNodesVis.markers[0].points.size());
         double size = m_octreeContact->getNodeSize(m_maxTreeDepth);
         frontierNodesVis.markers[0].header.frame_id = m_worldFrameId;
         frontierNodesVis.markers[0].header.stamp = rostime;
@@ -888,6 +887,7 @@ namespace jsk_pcl_ros
         m_fromarkerPub.publish(frontierNodesVis);
 
         // publish potential grid as marker
+        ROS_INFO_STREAM("potential marker size: " << potentialNodesVis.markers[0].points.size());
         potentialNodesVis.markers[0].header.frame_id = m_worldFrameId;
         potentialNodesVis.markers[0].header.stamp = rostime;
         potentialNodesVis.markers[0].ns = m_worldFrameId;
