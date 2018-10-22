@@ -765,6 +765,14 @@ namespace jsk_pcl_ros
             }
           }
         }
+        std::vector< std::vector< std::vector<int> > > check_free(x_num, std::vector< std::vector<int> >(y_num, std::vector<int>(z_num)));
+        for (int i=0; i<x_num; i++) {
+          for (int j=0; j<y_num; j++) {
+            for (int k=0; k<z_num; k++) {
+              check_free[i][j][k] = 0;
+            }
+          }
+        }
         std::vector< std::vector< std::vector<int> > > check_frontier(x_num, std::vector< std::vector<int> >(y_num, std::vector<int>(z_num)));
         for (int i=0; i<x_num; i++) {
           for (int j=0; j<y_num; j++) {
@@ -801,9 +809,6 @@ namespace jsk_pcl_ros
             double x_occupied = occupiedNodesVis.markers[idx].points[id].x;
             double y_occupied = occupiedNodesVis.markers[idx].points[id].y;
             double z_occupied = occupiedNodesVis.markers[idx].points[id].z;
-            // int x_min_index = std::round((x_occupied - (size_occupied / 2.0) - m_occupancyMinX) / size_occupied);
-            // int y_min_index = std::round((y_occupied - (size_occupied / 2.0) - m_occupancyMinY) / size_occupied);
-            // int z_min_index = std::round((z_occupied - (size_occupied / 2.0) - m_occupancyMinZ) / size_occupied);
             int x_min_index = std::round((x_occupied - (size_occupied / 2.0) - m_occupancyMinX) / resolution);
             int y_min_index = std::round((y_occupied - (size_occupied / 2.0) - m_occupancyMinY) / resolution);
             int z_min_index = std::round((z_occupied - (size_occupied / 2.0) - m_occupancyMinZ) / resolution);
@@ -820,8 +825,28 @@ namespace jsk_pcl_ros
           }
         }
 
-        // for all grids except occupied and unknown, (NOTE there are grids which are not free, nor occupied, nor unknown)
-        // check whether they are frontier, namely, adjecent to unknown grids
+        // for all free grids, store its information to array
+        pcl::PointCloud<pcl::PointXYZ> freeCloud;
+        for (int idx=0; idx<freeNodesVis.markers.size(); idx++) {
+          double size_free = freeNodesVis.markers[idx].scale.x;
+          for (int id=0; id<freeNodesVis.markers[idx].points.size(); id++) {
+            double x_free = freeNodesVis.markers[idx].points[id].x;
+            double y_free = freeNodesVis.markers[idx].points[id].y;
+            double z_free = freeNodesVis.markers[idx].points[id].z;
+            int x_min_index = std::round((x_free - (size_free / 2.0) - m_occupancyMinX) / resolution);
+            int y_min_index = std::round((y_free - (size_free / 2.0) - m_occupancyMinY) / resolution);
+            int z_min_index = std::round((z_free - (size_free / 2.0) - m_occupancyMinZ) / resolution);
+            for (int i=x_min_index; i<x_min_index+int(size_free/resolution); i++) {
+              for (int j=y_min_index; j<y_min_index+int(size_free/resolution); j++) {
+                for (int k=z_min_index; k<z_min_index+int(size_free/resolution); k++) {
+                  check_free[i][j][k] = 1;
+                }
+              }
+            }
+          }
+        }
+
+        // for all unknown grids, check whether they are frontier, namely, adjecent to free grids
         // NOTE all unknown grids are displaced half from the other grids
         geometry_msgs::Point cubeCenter;
         for (int i=0; i<x_num; i++) {
@@ -835,7 +860,8 @@ namespace jsk_pcl_ros
                         if ( 0 <= k+n && k+n < z_num) {
                           if (l == 0 && m == 0 && n== 0)
                             continue;
-                          if (check_unknown[i+l][j+m][k+n] == 1 && check_unknown[i][j][k] == 0 && check_occupied[i][j][k] == 0 && check_frontier[i][j][k] == 0) {
+                          // if (check_unknown[i+l][j+m][k+n] == 1 && check_unknown[i][j][k] == 0 && check_occupied[i][j][k] == 0 && check_frontier[i][j][k] == 0) {
+                          if (check_free[i+l][j+m][k+n] == 1 && check_free[i][j][k] == 0 && check_occupied[i][j][k] == 0 && check_unknown[i][j][k] == 1 && check_frontier[i][j][k] == 0) {
                             check_frontier[i][j][k] = 1;
                             cubeCenter.x = (i+0.5)*resolution + m_occupancyMinX;
                             cubeCenter.y = (j+0.5)*resolution + m_occupancyMinY;
