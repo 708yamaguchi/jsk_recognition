@@ -70,7 +70,7 @@
     <remap from="rgb/camera_info" to="$(arg camera_info)" />
     <remap from="rgb/image_rect_color" to="$(arg image)/$(arg image_type)" />
     <remap from="depth_registered/image_rect" to="/depth_image_creator_nodelet/output" />
-    <param name="qeueu_size" value="30" />
+    <param name="queue_size" value="30" />
   </node>
 
   <node name="pointcloud_screenpoint_nodelet" pkg="nodelet" type="nodelet"
